@@ -2,10 +2,10 @@
 
 
 ## Sensor: Light Sensor (able to sense when there is light and when there isn't)
-We are not sure what sensor to use as there is 2 different light sensors available, ** (SKU: U021 and U136) ** . As, we did not find precise specification
+We are not sure what sensor to use as there is 2 different light sensors available, ** SKU: U021 and U136 ** . As, we did not find precise specification
 for the first one.  
 ### Aditional sensor
-We saw that a flashlight unit exits ** (SKU: U152) ** , it could be an option for emiting the lights. However we do not
+We saw that a flashlight unit exits ** SKU: U152 ** , it could be an option for emiting the lights. However we do not
 know if it will be powerful enought.
 
 ## Idea:
