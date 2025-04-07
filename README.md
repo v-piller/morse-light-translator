@@ -1,10 +1,14 @@
-Morse Code Translator
+# Morse Code Translator
 
 
-Sensor: Light Sensor (able to sense when there is light and when there isn't)
+## Sensor: Light Sensor (able to sense when there is light and when there isn't)
+We are not sure what sensor to use as there is 2 different light sensors available, ** (SKU: U021 and U136) ** . As, we did not find precise specification
+for the first one.  
+### Aditional sensor
+We saw that a flashlight unit exits ** (SKU: U152) ** , it could be an option for emiting the lights. However we do not
+know if it will be powerful enought.
 
-
-Idea:
+## Idea:
 
 Make a server/web page where we can interact with the sensor (send messages that will be translated in morse code and receive messages in morse code that will be translated in a readable message). Two computers can interact with each other (send and receive).
 
