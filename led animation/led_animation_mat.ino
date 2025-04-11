@@ -16,7 +16,7 @@ void loop() {
     unsigned long currentMillis = millis();
 
     if(currentMillis - previousMillis >= interval){
-      preciousMillis = currentMillis;
+      previousMillis = currentMillis;
 
     // Extraire les composantes
     uint8_t r = (currentColor >> 16) & 0xFF;
