@@ -1,19 +1,11 @@
-# Morse Code Translator
+# 🌸Morse Code Translator💕
 
 
-## Sensor: Light Sensor (able to sense when there is light and when there isn't)
+## Sensor: Light Sensor and Flashlight
 
-The sensor we were thinking on using is: https://shop.m5stack.com/products/light-sensor-unit?srsltid=AfmBOorAT_KwV2GzEu7Np9zr26Jv7H7u_yf2j1E82jheaLuKGSv_uy9e
-We would also need LED light and we think a good option is this one: https://www.led1.de/shop/lng/en/standard-leds/led-5mm-ultra-bright/led-5mm-ultra-bright-white/nichia-led-5mm-white-44000mcd-nspw500gs-k1.html
+Sensor we are using: https://shop.m5stack.com/products/light-sensor-unit?srsltid=AfmBOorAT_KwV2GzEu7Np9zr26Jv7H7u_yf2j1E82jheaLuKGSv_uy9e
+LED light we are using: https://docs.m5stack.com/en/unit/FlashLight  /  https://www.bastelgarage.ch/m5stack-led-flashlight-unit-1-2643
 
-Additionally, we need resistors and maybe a breadboard, it could be useful. If we are not mistaken, we would also need wires.
-
-
-### Aditional sensor
-We saw that a flashlight unit:  https://docs.m5stack.com/en/unit/FlashLight  /  https://www.bastelgarage.ch/m5stack-led-flashlight-unit-1-2643 , it could be an option for emiting the lights. However we do not
-know if it will be powerful enough. It doesn't say the luminous instensity in mcd of the light, but it seems like it could work, we did our research and it seems like it has a luminous flux range of 100 to 150lm.
-
-According to our calculations, the luminous intesity needed for the light sensor to sens the light would be more than 20'000mcd or around 100lm of luminous flux (may be wrong).
 
 ## Idea:
 
@@ -24,3 +16,124 @@ We would use a LED light? to send the morse code from Computer 1 that will be se
 What do we do with the microprocessor?
 We would use it as the translator.
 
+
+---
+
+## BLUEPRINT / MODEL OF THE PROJECT (MAIN IDEA)
+
+### 💻 WHAT DOES THE MICROCONTROLLER DO?
+
+1. It **receives light signal info**, converts it into **binary**, then into **letters**.  
+   - Sends the **message word by word**.  
+   - Stores the words in a data structure (as individual strings or full message?).  
+   - Possibility to implement a **timestamped history** (like a mini chat log?)
+
+2. It can also do the **opposite direction**:  
+   - Receive a message as text,  
+   - Translate it to **Morse code**,  
+   - Send the **light signal** accordingly through the light unit.
+
+---
+
+### 🌐 WEBPAGE AND SERVER
+
+- The **webpage** sends a text string to the **server**.
+- The **server** forwards it to the **microcontroller** and vice versa.
+- The **server runs locally** on the computer and is connected to the webpage.
+
+---
+
+### 📚 LIBRARY
+
+We found a **Morse code translation library** — it works, but:
+
+- ❌ No automatic handling of **full text translation**
+- ❌ No space management between **words**
+- ❌ No **parsing of full Morse sequences**
+
+So we **added all of that ourselves** ✨
+
+---
+
+### 🔄 HOW DO WE CONVERT & TRANSLATE?
+
+We translate step by step:
+
+- Light info  
+- ➡️ Binary  
+- ➡️ Dots and dashes (Morse)  
+- ➡️ Letters  
+- *(And vice-versa)*
+
+### 🧃 Light Signal Interpretation
+
+```plaintext
+light duration → binary
+
+1         → dot  
+111       → dash  
+0         → symbol space (between dot & dash)  
+000       → letter space  
+0000000   → word space  
+
+Binary → Morse
+
+0000000  → /   (word separator)  
+. or //  →     (sentence separator)
+
+Morse → letters
+
+• We use a library that translates individual Morse letters  
+• Full message = built one letter at a time 
+```
+
+### 💡 DIFFERENT IDEAS TO EXPLORE
+
+#### ✨ Notifications
+
+- Use an **event-driven system**  
+    → Detect when a message arrives and trigger a **notification**  
+    (pop-up, sound, cute visual alert? 🔔🌸)
+    
+
+### ✂️ **When We Have the Morse Message...**
+
+#### 📚 Sentence Parser
+
+- Detects sentence endings (`.` or `//`)
+    
+- Stores them in a **structured format** (like an array or list)
+    
+
+---
+
+#### 💌 Word Parser
+
+- Splits sentences into words (`/`)
+    
+- Stores each word in a **word-level data structure**
+    
+
+---
+
+### 🧵 Two Options for Letter Translation
+
+#### Option 1: Letter-by-letter 💋
+
+- Split each Morse word into **individual letters**
+    
+- Translate each letter **one at a time**
+    
+- Append letters to a string to form the full word ✨
+    
+
+#### Option 2: Whole Word Decode 🌈
+
+- Take a full Morse word
+    
+- Loop through the characters
+    
+- Translate and combine into a single word string 💕
+    
+
+   
