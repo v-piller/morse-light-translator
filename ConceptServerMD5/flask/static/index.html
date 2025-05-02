@@ -135,34 +135,109 @@
 
   <!-- ========== JavaScript (client logic) ========== -->
   <script>
-    const SERVER_URL = "http://127.0.0.1:5000";       // e.g. http://127.0.0.1:5000
+    // --- Configuration ---
+    const SERVER_URL = "http://127.0.0.1:5000"; // Assurez-vous que c'est la bonne URL !
+    const POLLING_INTERVAL = 3000; // Interroger toutes les 3000 ms (3 secondes)
 
+    // --- Références aux éléments HTML --- (CORRECTIF : Définir ici !)
+    const messageInput = document.getElementById('messageInput');
+    const receivedTextElement = document.getElementById('receivedText');
+    const lightIndicator = document.getElementById('lightIndicator');
+
+    // --- Fonction pour envoyer un message au serveur ---
     async function sendMessage(msg) {
-      const response = await fetch(`${SERVER_URL}/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `msg=${encodeURIComponent(msg)}`
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!msg.trim()) {
+          console.log("Tentative d'envoi d'un message vide annulée.");
+          return;
+      }
+      try {
+          const response = await fetch(`${SERVER_URL}/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `msg=${encodeURIComponent(msg)}`
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          console.log("Message envoyé avec succès.");
+          // Après l'envoi, récupérer immédiatement le message pour mise à jour
+          fetchMessage();
+      } catch (error) {
+          console.error("Erreur lors de l'envoi du message:", error);
+          throw error; // Renvoyer l'erreur pour qu'elle soit traitée par l'appelant
+      }
     }
 
-    function flashLight(number) {
-        
+    // --- Fonction pour faire clignoter l'indicateur lumineux --- (CORRECTIF : Implémenter)
+    function flashLight(duration) { // Renommé le paramètre pour plus de clarté
+      if (lightIndicator) { // Vérifie que l'élément existe
+         lightIndicator.classList.add('on');
+         // Enlève la classe 'on' après la durée spécifiée
+         setTimeout(() => {
+             lightIndicator.classList.remove('on');
+         }, duration);
+       } else {
+           console.error("Element 'lightIndicator' non trouvé.");
+       }
     }
 
-    /* --- rest of your existing code, just call sendMessage() in the form handler --- */
+    // --- Fonction pour récupérer le dernier message du serveur ---
+    async function fetchMessage() {
+        // Utilise la variable globale receivedTextElement définie plus haut
+        if (!receivedTextElement) {
+             console.error("Element 'receivedTextElement' non trouvé.");
+             return;
+        }
+        try {
+            const response = await fetch(`${SERVER_URL}/get`);
+            if (!response.ok) {
+                console.error(`Erreur HTTP lors de la récupération: ${response.status}`);
+                // receivedTextElement.textContent = "[Erreur serveur]"; // Optionnel
+                return;
+            }
+            const data = await response.json();
+            // Met à jour si l'élément existe
+             receivedTextElement.textContent = data.message || "Waiting...";
+
+        } catch (err) {
+            console.error("Erreur réseau lors de la récupération du message:", err);
+             if (receivedTextElement) { // Vérifie avant d'écrire
+                receivedTextElement.textContent = "[Erreur réseau]";
+             }
+        }
+    }
+
+    // --- Écouteur d'événement pour l'envoi du formulaire --- (CORRECTIF : Un seul !)
     document.getElementById("sendForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+      // Utilise la variable globale messageInput définie plus haut
+      const messageToSend = messageInput.value;
+
+      if (!messageToSend.trim()) {
+          alert("Veuillez entrer un message.");
+          return;
+      }
+
       try {
-        await sendMessage(messageInput.value);
-        flashLight(500);
+        await sendMessage(messageToSend);
+        flashLight(500); // Appelle la fonction flashLight implémentée
         messageInput.value = "";
       } catch (err) {
-        alert("Error sending: " + err.message);
+        // L'erreur est déjà loggée dans sendMessage, on affiche juste l'alerte
+        alert("Erreur lors de l'envoi: " + err.message);
       }
     });
 
-    /* polling logic unchanged */
+    // --- Démarrage du Polling ---
+    // Vérifier que l'élément existe avant de lancer le polling
+    if (receivedTextElement) {
+        fetchMessage(); // Appel initial
+        setInterval(fetchMessage, POLLING_INTERVAL); // Polling régulier
+        console.log("Logique client initialisée. Polling démarré.");
+    } else {
+        console.error("Impossible de démarrer le polling: élément 'receivedText' non trouvé.");
+    }
+
+    // (CORRECTIF : Le deuxième écouteur d'événement redondant a été supprimé)
+
   </script>
 
 </body>
