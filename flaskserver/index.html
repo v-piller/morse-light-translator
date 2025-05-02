@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Morse Code Translator</title>
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #0a0a0a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      color: #fff;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px #fff;
+    }
+
+    .gif-container {
+      margin: 20px 0;
+    }
+
+    .gif-container img {
+      width: 220px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px #fff;
+    }
+
+    form {
+      margin: 20px 0;
+    }
+
+    input[type="text"] {
+      width: 300px;
+      padding: 12px;
+      font-size: 16px;
+      border: 2px solid #fff;
+      background: #111;
+      color: #fff;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+      background-color: #fff;
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #ff0000
+    }
+
+    #received {
+      margin-top: 40px;
+      padding: 20px;
+      background: #111;
+      border: 2px solid #fff;
+      border-radius: 10px;
+      width: 80%;
+      max-width: 600px;
+      box-shadow: 0 0 15px #ff0000;
+    }
+
+    #received h3 {
+      margin-top: 0;
+      color: #fff;
+    }
+
+    #receivedText {
+      font-family: 'Courier New', monospace;
+      font-size: 1.2em;
+      white-space: pre-wrap;
+      color: #ff0000;
+    }
+
+    .signal-light {
+      margin-top: 20px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #222;
+      box-shadow: 0 0 10px #fff;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .signal-light.on {
+      background: #fff;
+      box-shadow: 0 0 20px #fff, 0 0 60px #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Morse Code Web Chat</h1>
+
+  <div class="gif-container">
+    <img src="https://media1.tenor.com/m/0wNFACbg25wAAAAC/code-morse.gif" alt="Morse Code GIF">
+  </div>
+
+  <form id="sendForm">
+    <input type="text" id="messageInput" placeholder="Enter message to send" required />
+    <button type="submit">Send</button>
+  </form>
+
+  <div class="signal-light" id="lightIndicator"></div>
+
+  <div id="received">
+    <h3>Received Message:</h3>
+    <pre id="receivedText">Waiting...</pre>
+  </div>
+
+  <script>
+    const SERVER_URL = "http://127.0.0.1:5000";
+    // Signal light animation (for visual effect)
+    function flashLight(duration = 300) {
+      const light = document.getElementById("lightIndicator");
+      light.classList.add("on");
+      setTimeout(() => light.classList.remove("on"), duration);
+    }
+
+    // Send form data to the server
+    document.getElementById("sendForm").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      const message = document.getElementById("messageInput").value;
+
+      try {
+        await fetch(`${SERVER_URL}/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: `msg=${encodeURIComponent(message)}`
+        });
+        flashLight(500); // Visual feedback
+        alert("Message sent!");
+        document.getElementById("messageInput").value = "";
+      } catch (err) {
+        alert("Error sending message: " + err);
+      }
+    });
+
+    // Periodically fetch received message
+    async function fetchReceivedMessage() {
+      try {
+        const response = await fetch(`${SERVER_URL}/get`);
+        const data = await response.json();
+        document.getElementById("receivedText").textContent = data.message || "No message.";
+      } catch (err) {
+        document.getElementById("receivedText").textContent = "Error retrieving message.";
+      }
+    }
+
+    setInterval(fetchReceivedMessage, 3000);
+    fetchReceivedMessage();
+  </script>
+
+</body>
+</html>
