@@ -1,0 +1,1 @@
+Documentation sur la fonction wire.h, qui est la bibliothèque permettant de gérer le protocole I2C servant à Elle permet à ton microcontrôleur (par ex. l’ESP32 dans ton M5Atom Lite) de communiquer avec d’autres puces ou modules (comme le FlashLight Unit, des capteurs, des écrans)
