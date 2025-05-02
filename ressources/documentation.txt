@@ -1,0 +1,2 @@
+Documentation sur la librairie wire.h permettant de gérer le protocole i2c qui sert mettre le microcontroleur en communication avec d'autres puces ou modules, typiquement flashlight unit:
+https://docs.arduino.cc/language-reference/en/functions/communication/wire/
