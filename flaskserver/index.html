@@ -1,47 +1,35 @@
 <!DOCTYPE html>
-<!--  ========== Morse Code Web Chat ==========
-      This single-file web page provides a front-end for sending text to a
-      backend (Flask on http://127.0.0.1:5000) which translates / stores
-      Morse-code messages.  It also polls the backend to display the most
-      recent message every 3 s.  A small “signal-light” circle flashes when
-      a message is sent for visual feedback.                           -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Morse Code Translator</title>
-
-  <!-- ========== CSS (in-page for simplicity) ========== -->
   <style>
-    /* ---------- Global page styling ---------- */
     body {
-      font-family: 'Courier New', Courier, monospace;  /* retro terminal vibe   */
-      background-color: #0a0a0a;                       /* dark theme background */
-      color: #e0e0e0;                                  /* light gray text       */
-      display: flex;                                   /* center page contents  */
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #0a0a0a;
+      color: #e0e0e0;
+      display: flex;
       flex-direction: column;
       align-items: center;
       padding: 40px;
     }
 
-    /* ---------- Title ---------- */
     h1 {
       font-size: 2.5em;
       color: #fff;
       margin-bottom: 10px;
-      text-shadow: 0 0 10px #fff;   /* subtle glow */
+      text-shadow: 0 0 10px #fff;
     }
 
-    /* ---------- GIF container ---------- */
-    .gif-container {                /* centers the image & adds spacing */
+    .gif-container {
       margin: 20px 0;
     }
     .gif-container img {
-      width: 220px;                 /* fixed width keeps layout stable  */
-      border-radius: 10px;          /* soft rounded corners             */
-      box-shadow: 0 0 20px #fff;    /* white glow around the GIF        */
+      width: 220px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px #fff;
     }
 
-    /* ---------- Form / input styling ---------- */
     form {
       margin: 20px 0;
     }
@@ -49,7 +37,7 @@
       width: 300px;
       padding: 12px;
       font-size: 16px;
-      border: 2px solid #fff;       /* white border for contrast        */
+      border: 2px solid #fff;
       background: #111;
       color: #fff;
       border-radius: 6px;
@@ -58,110 +46,134 @@
       padding: 12px 20px;
       font-size: 16px;
       margin-left: 10px;
-      background-color: #fff;       /* white button with black text     */
+      background-color: #fff;
       color: #000;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       transition: background-color 0.2s;
     }
-    button:hover {                  /* highlight on hover               */
+    button:hover {
       background-color: #ff0000;
     }
 
-    /* ---------- Received-message panel ---------- */
-    #received {
-      margin-top: 40px;
+    .panel {
+      margin-top: 30px;
       padding: 20px;
       background: #111;
       border: 2px solid #fff;
       border-radius: 10px;
       width: 80%;
       max-width: 600px;
-      box-shadow: 0 0 15px #ff0000; /* red glow matches send btn hover  */
+      box-shadow: 0 0 15px #ff0000;
     }
-    #received h3 {
+
+    .panel h3 {
       margin-top: 0;
       color: #fff;
     }
-    #receivedText {
+
+    pre {
       font-family: 'Courier New', monospace;
-      font-size: 1.2em;
-      white-space: pre-wrap;        /* preserve line breaks             */
+      font-size: 1.1em;
+      white-space: pre-wrap;
       color: #ff0000;
     }
 
-    /* ---------- Signal-light (visual flash) ---------- */
     .signal-light {
       margin-top: 20px;
       width: 50px;
       height: 50px;
       border-radius: 50%;
-      background: #222;             /* dark circle when idle            */
-      box-shadow: 0 0 10px #fff;    /* faint glow                      */
+      background: #222;
+      box-shadow: 0 0 10px #fff;
       transition: background 0.3s, box-shadow 0.3s;
     }
-    .signal-light.on {              /* class toggled in JS (flash)      */
-      background: #fff;             /* bright white                     */
+    .signal-light.on {
+      background: #fff;
       box-shadow: 0 0 20px #fff, 0 0 60px #fff;
     }
   </style>
 </head>
-
 <body>
-  <!-- ========== Main content ========== -->
   <h1>Morse Code Web Chat</h1>
 
-  <!-- Fun thematic GIF (Studio Ghibli signal lamp) -->
   <div class="gif-container">
     <img src="https://media1.tenor.com/m/0wNFACbg25wAAAAC/code-morse.gif" alt="Morse Code GIF">
   </div>
 
-  <!-- Text-input form -->
   <form id="sendForm">
-    <!-- Users type a plain-text message; backend handles Morse translation -->
     <input type="text" id="messageInput" placeholder="Enter message to send" required />
     <button type="submit">Send</button>
   </form>
 
-  <!-- Circle that briefly lights up when a message is sent -->
   <div class="signal-light" id="lightIndicator"></div>
 
-  <!-- Area that shows the last message the server stored -->
-  <div id="received">
-    <h3>Received Message:</h3>
-    <pre id="receivedText">Waiting...</pre> <!-- updated via JS polling -->
+  <div class="panel" id="sent">
+    <h3>Sent Messages:</h3>
+    <pre id="sentText">Waiting...</pre>
   </div>
 
-  <!-- ========== JavaScript (client logic) ========== -->
+  <div class="panel" id="received">
+    <h3>Received Messages:</h3>
+    <pre id="receivedText">Waiting...</pre>
+  </div>
+
   <script>
     const SERVER_URL = "http://127.0.0.1:5000";
-  
+    const POLLING_INTERVAL = 3000;
+
+    const messageInput = document.getElementById('messageInput');
+    const receivedTextElement = document.getElementById('receivedText');
+    const sentTextElement = document.getElementById('sentText');
+    const lightIndicator = document.getElementById('lightIndicator');
+
     async function sendMessage(msg) {
       const response = await fetch(`${SERVER_URL}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `msg=${encodeURIComponent(msg)}`
+        body: `msg=${encodeURIComponent(msg)}&from=user`
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
     }
-  function flashLight(number) {
-    
-  }
-    /* --- rest of our existing code, just call sendMessage() in the form handler --- */
+
+    function flashLight(duration = 500) {
+      if (lightIndicator) {
+        lightIndicator.classList.add('on');
+        setTimeout(() => lightIndicator.classList.remove('on'), duration);
+      }
+    }
+
+    function formatMessages(messages) {
+      return messages.map(m => `[${m.timestamp}] (${m.from}): ${m.text}`).join("\n");
+    }
+
+    async function fetchMessages() {
+      try {
+        const response = await fetch(`${SERVER_URL}/get`);
+        const data = await response.json();
+        sentTextElement.textContent = formatMessages(data.sent);
+        receivedTextElement.textContent = formatMessages(data.received);
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }
+
     document.getElementById("sendForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+      const msg = messageInput.value.trim();
+      if (!msg) return alert("Please enter a message.");
       try {
-        await sendMessage(messageInput.value);
-        flashLight(500);
+        await sendMessage(msg);
+        flashLight();
         messageInput.value = "";
       } catch (err) {
-        alert("Error sending: " + err.message);
+        alert("Send error: " + err.message);
       }
     });
-  
-    /* polling logic unchanged */
+
+    fetchMessages();
+    setInterval(fetchMessages, POLLING_INTERVAL);
   </script>
-  
 </body>
 </html>
