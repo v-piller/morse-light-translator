@@ -1,19 +1,17 @@
+#include "string_to_light.h"
 #include "morse.h"
 #include <stdio.h>
 #include <stddef.h>
-#include <M5Atom.h>
 
 #define FLASH_PIN 26  // Built-in LED on M5Atom
 
 const int DOT_TIME = 200;             // 200 ms for a dot
 const int DASH_TIME = 3 * DOT_TIME;   // 600 ms for a dash (3 units)
 const int GAP_INTRA_CHAR = DOT_TIME;  // 200 ms gap between parts of the same letter
-const int GAP_LETTER = 3 * DOT_TIME;  // 600 ms gap between letters
-const int GAP_WORD = 7 * DOT_TIME;    // 1400 ms gap between words
+const int GAP_LETTER = 2 * DOT_TIME;  // 600 ms gap between letters, minus one already include break
+const int GAP_WORD = 6 * DOT_TIME;    // 1400 ms gap between words, minus one already include break
 
 
-char* message = "My name is Valeria.";
-char morse[512];
 
 
 //For dot (.), short flash:
@@ -35,7 +33,7 @@ void transmitDash() {
 //make lights go off and on with the whole string/message already in morse
 void transmitMessage(const char* text) {
     char morseBuf[512];               // Buffer stays local to this function
-    text_to_morse(message, morseBuf);
+    text_to_morse(text, morseBuf);
     Serial.print("Morse message: ");
     Serial.println(morseBuf);          // Print Morse for debugging
 
@@ -52,34 +50,4 @@ void transmitMessage(const char* text) {
             delay(6*DOT_TIME);
         }
     }
-}
-
-/*
-int main (void) {
-    text_to_morse(message, morse);
-    printf("Message: %s\n", text);
-    printf("Message in morse code: %s\n", morse);
-
-
-    transmitMessage(morse);
-    //morse_to_text(morse, text);
-    //printf("Morse: %s\n", morse);
-    //printf("Final message: %s\n", text);
-
-    return 0;
-}
-*/
-
-void setup() {
-  M5.begin(true, false, true); // Atom initialization
-  pinMode(FLASH_PIN, OUTPUT);
-  digitalWrite(FLASH_PIN, LOW);
-
-  Serial.begin(115200);
-
-  transmitMessage(message);
-}
-
-void loop() {
-  // do nothing
 }
