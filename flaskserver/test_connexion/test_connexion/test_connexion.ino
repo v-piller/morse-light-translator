@@ -3,8 +3,6 @@
 #include <ESPmDNS.h>
 #include <HTTPClient.h> // <-- Pour faire des requêtes HTTP
 #include <WiFiClient.h>
-#include "string_to_light.h"
-#include "morse.h"
 
 const char* ssid = "SURFACE-JEREMIE 2090"; // Nom du hotspot créé sur le PC
 const char* password = ">40Fc667"; // Mot de passe du hotspot
@@ -148,52 +146,7 @@ void sendTestMessage() {
         Serial.println("Echec de l'initialisation de la connexion HTTP.");
     }
 }
-char* receiveMessage() {
-    // Vérifie si le serveur a été trouvé et si le WiFi est connecté
-    if (!serverFound || WiFi.status() != WL_CONNECTED) {
-        Serial.println("Impossible de recevoir le message: Serveur non trouvé ou WiFi déconnecté.");
-        return ""; // Retourne une chaîne vide en cas d'erreur
-    }
 
-    WiFiClient client; // Crée un client WiFi
-    HTTPClient http;   // Crée un client HTTP
-
-    // Construit l'URL complète du endpoint pour recevoir des messages
-    String url = "http://" + serverIp.toString() + ":" + String(serverPort) + "/get";
-    Serial.print("Tentative de réception GET depuis: ");
-    Serial.println(url);
-
-    char* payload = ""; // Variable pour stocker la réponse du serveur
-
-    // Démarre la connexion HTTP
-    if (http.begin(client, url)) { 
-        // Exécute la requête GET
-        int httpCode = http.GET();
-
-        // Vérifie le code de retour HTTP
-        if (httpCode > 0) {
-            Serial.printf("Code de réponse HTTP (GET): %d\n", httpCode);
-
-            // Vérifie si la requête a réussi (Code 200 OK)
-            if (httpCode == HTTP_CODE_OK) {
-                payload = http.getString(); // Récupère la charge utile de la réponse
-                Serial.println("Message reçu avec succès du serveur!");
-                Serial.println("Réponse: " + payload);
-            } else {
-                Serial.printf("Le serveur a répondu avec une erreur (GET): %d\n", httpCode);
-            }
-        } else {
-            // Erreur lors de la connexion ou de la requête
-            Serial.printf("Echec de la requête GET, erreur: %s\n", http.errorToString(httpCode).c_str());
-        }
-
-        // Termine la connexion HTTP (important!)
-        http.end();
-    } else {
-        Serial.println("Echec de l'initialisation de la connexion HTTP (GET).");
-    }
-    return payload; // Retourne le message reçu (ou une chaîne vide si erreur)
-}
 void loop() {
   // Votre code principal ici
   // Par exemple, envoyer des requêtes au serveur si serverFound est true
@@ -203,8 +156,6 @@ void loop() {
       // http.begin(client, "http://" + serverIp.toString() + ":" + String(serverPort) + "/get");
       // ... etc ...
       sendTestMessage();
-      transmitMessage(receiveMessage());
-
   } else {
       // Indiquer l'erreur (ex: LED clignotante)
   }
