@@ -16,7 +16,8 @@ bool serverFound = false; // Flag pour indiquer si le serveur a été trouvé
 void setup() {
   Serial.begin(115200);
   M5.begin(true, false, true); // Initialise M5Atom (Serial, I2C, Display)
-
+  pinMode(FLASH_PIN, OUTPUT);
+  digitalWrite(FLASH_PIN, LOW);
   WiFi.mode(WIFI_STA); // Définit le mode Wi-Fi en Station
   WiFi.begin(ssid, password); // Tente la connexion au hotspot du PC
   Serial.print("Connexion au hotspot du PC...");
@@ -117,9 +118,6 @@ void sendTestMessage() {
         // Prépare les données à envoyer (le message "test")
        String postData = "msg=test&sender=device";
        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-       http.POST(postData);
-
-
         // Exécute la requête POST
         int httpCode = http.POST(postData);
 
@@ -148,65 +146,124 @@ void sendTestMessage() {
         Serial.println("Echec de l'initialisation de la connexion HTTP.");
     }
 }
-char* receiveMessage() {
-    // Vérifie si le serveur a été trouvé et si le WiFi est connecté
+// Fonction modifiée pour recevoir ET PARSER le message du serveur
+String receiveMessage() {
+    static String lastMessage;
     if (!serverFound || WiFi.status() != WL_CONNECTED) {
-        Serial.println("Impossible de recevoir le message: Serveur non trouvé ou WiFi déconnecté.");
-        return ""; // Retourne une chaîne vide en cas d'erreur
+        Serial.println("[receiveMessage] Impossible de recevoir: Serveur non trouvé ou WiFi déconnecté.");
+        return ""; // Retourne une chaîne vide
     }
 
-    WiFiClient client; // Crée un client WiFi
-    HTTPClient http;   // Crée un client HTTP
+    WiFiClient client;
+    HTTPClient http;
+    String messageContent = ""; // Pour stocker le message extrait
+    String senderId = "";
 
-    // Construit l'URL complète du endpoint pour recevoir des messages
-    String url = "http://" + serverIp.toString() + ":" + String(serverPort) + "/get";
-    Serial.print("Tentative de réception GET depuis: ");
-    Serial.println(url);
+    String url_str = "http://" + serverIp.toString() + ":" + String(serverPort) + "/get";
+    Serial.print("[receiveMessage] Tentative de réception GET depuis: ");
+    Serial.println(url_str);
 
-    char* payload = ""; // Variable pour stocker la réponse du serveur
-
-    // Démarre la connexion HTTP
-    if (http.begin(client, url)) { 
-        // Exécute la requête GET
+    if (http.begin(client, url_str.c_str())) { // Utiliser .c_str()
         int httpCode = http.GET();
 
-        // Vérifie le code de retour HTTP
         if (httpCode > 0) {
-            Serial.printf("Code de réponse HTTP (GET): %d\n", httpCode);
-
-            // Vérifie si la requête a réussi (Code 200 OK)
+            Serial.printf("[receiveMessage] Code de réponse HTTP GET: %d\n", httpCode);
             if (httpCode == HTTP_CODE_OK) {
-                payload = http.getString(); // Récupère la charge utile de la réponse
-                Serial.println("Message reçu avec succès du serveur!");
-                Serial.println("Réponse: " + payload);
+                String payload = http.getString(); // Récupère la réponse JSON brute
+                Serial.println("[receiveMessage] Réponse brute du serveur: " + payload);
+
+                // Parsing JSON manuel amélioré pour extraire la valeur de "msg"
+                int key_idx = payload.indexOf("\"msg\""); // Cherche la clé exacte "\"msg\""
+                if (key_idx != -1) {
+                    // Clé trouvée. Chercher les deux-points après la clé.
+                    // Longueur de "\"msg\"" est 5.
+                    int colon_idx = payload.indexOf(":", key_idx + 5);
+                    if (colon_idx != -1) {
+                        // Deux-points trouvés. Chercher le guillemet ouvrant de la valeur.
+                        int value_start_quote_idx = payload.indexOf("\"", colon_idx + 1);
+                        if (value_start_quote_idx != -1) {
+                            // Guillemet ouvrant trouvé. Chercher le guillemet fermant de la valeur.
+                            int value_end_quote_idx = payload.indexOf("\"", value_start_quote_idx + 1);
+                            if (value_end_quote_idx != -1) {
+                                // Guillemet fermant trouvé. Extraire la sous-chaîne.
+                                messageContent = payload.substring(value_start_quote_idx + 1, value_end_quote_idx);
+                                Serial.println("[receiveMessage] Message parsé ('msg'): " + messageContent);
+                                // Extraire "sender"
+                                int sender_key_idx = payload.indexOf("\"sender\"");
+                                if (sender_key_idx != -1) {
+                                    int sender_colon_idx = payload.indexOf(":", sender_key_idx + 8); 
+                                    if (sender_colon_idx != -1) {
+                                        int sender_value_start_quote_idx = payload.indexOf("\"", sender_colon_idx + 1);
+                                        if (sender_value_start_quote_idx != -1) {
+                                            int sender_value_end_quote_idx = payload.indexOf("\"", sender_value_start_quote_idx + 1);
+                                            if (sender_value_end_quote_idx != -1) {
+                                                // C'EST ICI QUE senderId OBTIENT SA VALEUR :
+                                                senderId = payload.substring(sender_value_start_quote_idx + 1, sender_value_end_quote_idx);
+                                                Serial.println("[receiveMessage] Expéditeur parsé ('sender'): " + senderId);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Serial.println("[receiveMessage] Clé '\"sender\"' non trouvée dans JSON.");
+                                }
+                                if (senderId.equals("device")) {
+                                    messageContent = "";
+                                    Serial.println("[Message Canceled] message comming from self");
+                                    }
+                                else{
+                                    if (messageContent == lastMessage){
+                                        messageContent = "";
+                                        Serial.println("[Message Canceled] already received");
+                                    }
+                                    else{
+                                        lastMessage = messageContent;
+                                    }
+                                }
+                            } else {
+                                Serial.println("[receiveMessage] Erreur parsing JSON: Guillemet de fin de valeur pour 'msg' non trouvé.");
+                            }
+                        } else {
+                            Serial.println("[receiveMessage] Erreur parsing JSON: Guillemet de début de valeur pour 'msg' non trouvé.");
+                        }
+                    } else {
+                        Serial.println("[receiveMessage] Erreur parsing JSON: Deux-points après la clé 'msg' non trouvés.");
+                    }
+                } else {
+                    Serial.println("[receiveMessage] Erreur parsing JSON: Clé '\"msg\"' non trouvée.");
+                    // Optionnel: Tenter de parser "message" comme fallback ou pour débogage
+                    // si votre serveur pouvait utiliser l'une ou l'autre clé.
+                    int old_msg_key_start = payload.indexOf("\"message\"");
+                    if (old_msg_key_start != -1) {
+                         Serial.println("[receiveMessage] Info: Ancienne clé '\"message\"' trouvée, mais '\"msg\"' était attendue et non trouvée.");
+                    }
+                }
             } else {
-                Serial.printf("Le serveur a répondu avec une erreur (GET): %d\n", httpCode);
+                Serial.printf("[receiveMessage] Le serveur a répondu avec une erreur (GET): %d\n", httpCode);
             }
         } else {
-            // Erreur lors de la connexion ou de la requête
-            Serial.printf("Echec de la requête GET, erreur: %s\n", http.errorToString(httpCode).c_str());
+            Serial.printf("[receiveMessage] Echec de la requête GET, erreur: %s\n", http.errorToString(httpCode).c_str());
         }
-
-        // Termine la connexion HTTP (important!)
         http.end();
     } else {
-        Serial.println("Echec de l'initialisation de la connexion HTTP (GET).");
+        Serial.println("[receiveMessage] Echec de l'initialisation de la connexion HTTP (GET).");
     }
-    return payload; // Retourne le message reçu (ou une chaîne vide si erreur)
+    return messageContent; // Retourne le message extrait ou une chaîne vide
 }
+unsigned long lastSendTime = 0;
+const unsigned long sendInterval = 60000;
 void loop() {
+    unsigned long counter = 0;
   // Votre code principal ici
   // Par exemple, envoyer des requêtes au serveur si serverFound est true
   if (serverFound) {
-      // Exemple: Envoyer une requête toutes les 10 secondes (à adapter)
-      // Vous aurez besoin d'une bibliothèque HTTP Client (ex: <HTTPClient.h>)
-      // http.begin(client, "http://" + serverIp.toString() + ":" + String(serverPort) + "/get");
-      // ... etc ...
+    unsigned long now = millis();
+    if (now - lastSendTime >= sendInterval) {
       sendTestMessage();
-      transmitMessage(receiveMessage());
+      lastSendTime = now;
+    }
 
+    transmitMessage(receiveMessage().c_str());
   } else {
       // Indiquer l'erreur (ex: LED clignotante)
   }
-  delay(10000); // Attendre 10 secondes
 }
