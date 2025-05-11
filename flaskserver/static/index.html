@@ -1,16 +1,9 @@
 <!DOCTYPE html>
-<!--  ========== Morse Code Web Chat ==========
-      This single-file web page provides a front-end for sending text to a
-      backend (Flask on http://127.0.0.1:5000) which translates / stores
-      Morse-code messages.  It also polls the backend to display the most
-      recent message every 3 s.  A small “signal-light” circle flashes when
-      a message is sent for visual feedback.                           -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Morse Code Translator</title>
 
-  <!-- ========== CSS (in-page for simplicity) ========== -->
   <style>
     /* ---------- Global page styling ---------- */
     body {
@@ -109,67 +102,57 @@
 </head>
 
 <body>
-  <!-- ========== Main content ========== -->
   <h1>Morse Code Web Chat</h1>
 
-  <!-- Fun thematic GIF (Studio Ghibli signal lamp) -->
   <div class="gif-container">
     <img src="https://media1.tenor.com/m/0wNFACbg25wAAAAC/code-morse.gif" alt="Morse Code GIF">
   </div>
 
-  <!-- Text-input form -->
   <form id="sendForm">
-    <!-- Users type a plain-text message; backend handles Morse translation -->
     <input type="text" id="messageInput" placeholder="Enter message to send" required />
     <button type="submit">Send</button>
   </form>
 
-  <!-- Circle that briefly lights up when a message is sent -->
   <div class="signal-light" id="lightIndicator"></div>
 
-  <!-- Area that shows the last message the server stored -->
   <div id="received">
     <h3>Received Message:</h3>
-    <pre id="receivedText">Waiting...</pre> <!-- updated via JS polling -->
-  </div>
+    <pre id="receivedText">Waiting...</pre> </div>
 
-  <!-- ========== JavaScript (client logic) ========== -->
   <script>
     // --- Configuration ---
-    const SERVER_URL = "http://127.0.0.1:5000"; // Assurez-vous que c'est la bonne URL !
+    const SERVER_URL = `http://${window.location.hostname}:5000`;
     const POLLING_INTERVAL = 3000; // Interroger toutes les 3000 ms (3 secondes)
 
-    // --- Références aux éléments HTML --- (CORRECTIF : Définir ici !)
+    // --- Références aux éléments HTML ---
     const messageInput = document.getElementById('messageInput');
     const receivedTextElement = document.getElementById('receivedText');
     const lightIndicator = document.getElementById('lightIndicator');
 
     // --- Fonction pour envoyer un message au serveur ---
    async function sendMessage(msg) {
-  if (!msg.trim()) return;                    // sécurité anti-vide (à garder)
+      if (!msg.trim()) return;
 
-  // Corps POST encodé façon application/x-www-form-urlencoded
-  const body = new URLSearchParams({
-    msg,              // le texte saisi
-    sender: "web"     // balise d’origine
-  });
+      const body = new URLSearchParams({
+        msg,
+        sender: "web"     // Balise d'origine pour les messages envoyés depuis la page web
+      });
 
-  const response = await fetch(`${SERVER_URL}/send`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body
-  });
+      const response = await fetch(`${SERVER_URL}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      });
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  console.log("Message envoyé avec succès.");
-  fetchMessage();                              // rafraîchir l’affichage
-}
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      console.log("Message envoyé avec succès.");
+      fetchMessage(); // Rafraîchir l’affichage après envoi
+    }
 
-    // --- Fonction pour faire clignoter l'indicateur lumineux --- (CORRECTIF : Implémenter)
-    function flashLight(duration) { // Renommé le paramètre pour plus de clarté
-      if (lightIndicator) { // Vérifie que l'élément existe
+    // --- Fonction pour faire clignoter l'indicateur lumineux ---
+    function flashLight(duration) {
+      if (lightIndicator) {
          lightIndicator.classList.add('on');
-         // Enlève la classe 'on' après la durée spécifiée
          setTimeout(() => {
              lightIndicator.classList.remove('on');
          }, duration);
@@ -180,7 +163,6 @@
 
     // --- Fonction pour récupérer le dernier message du serveur ---
     async function fetchMessage() {
-        // Utilise la variable globale receivedTextElement définie plus haut
         if (!receivedTextElement) {
              console.error("Element 'receivedTextElement' non trouvé.");
              return;
@@ -189,25 +171,35 @@
             const response = await fetch(`${SERVER_URL}/get`);
             if (!response.ok) {
                 console.error(`Erreur HTTP lors de la récupération: ${response.status}`);
-                // receivedTextElement.textContent = "[Erreur serveur]"; // Optionnel
                 return;
             }
             const data = await response.json();
-            // Met à jour si l'élément existe
-             receivedTextElement.textContent = data.message || "Waiting...";
+            if (data && data.sender === "web") {
+                console.log("Le message actuel sur le serveur provient de 'web'. L'affichage n'est pas mis à jour avec ce message.");
+            } else if (data && data.msg) {
+                if (data.sender) {
+                    receivedTextElement.textContent = `${data.sender}: ${data.msg}`;
+                } else {
+                    receivedTextElement.textContent = data.msg;
+                }
+            } else if (data && data.message) { // Fallback pour l'ancien format au cas où
+                 receivedTextElement.textContent = data.message;
+            }
+            else {
+                receivedTextElement.textContent = "Waiting...";
+            }
 
         } catch (err) {
             console.error("Erreur réseau lors de la récupération du message:", err);
-             if (receivedTextElement) { // Vérifie avant d'écrire
+             if (receivedTextElement) {
                 receivedTextElement.textContent = "[Erreur réseau]";
              }
         }
     }
 
-    // --- Écouteur d'événement pour l'envoi du formulaire --- (CORRECTIF : Un seul !)
+    // --- Écouteur d'événement pour l'envoi du formulaire ---
     document.getElementById("sendForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      // Utilise la variable globale messageInput définie plus haut
       const messageToSend = messageInput.value;
 
       if (!messageToSend.trim()) {
@@ -217,25 +209,21 @@
 
       try {
         await sendMessage(messageToSend);
-        flashLight(500); // Appelle la fonction flashLight implémentée
+        flashLight(500);
         messageInput.value = "";
       } catch (err) {
-        // L'erreur est déjà loggée dans sendMessage, on affiche juste l'alerte
         alert("Erreur lors de l'envoi: " + err.message);
       }
     });
 
     // --- Démarrage du Polling ---
-    // Vérifier que l'élément existe avant de lancer le polling
     if (receivedTextElement) {
         fetchMessage(); // Appel initial
-        setInterval(fetchMessage, POLLING_INTERVAL); // Polling régulier
+        setInterval(fetchMessage, POLLING_INTERVAL);
         console.log("Logique client initialisée. Polling démarré.");
     } else {
         console.error("Impossible de démarrer le polling: élément 'receivedText' non trouvé.");
     }
-
-    // (CORRECTIF : Le deuxième écouteur d'événement redondant a été supprimé)
 
   </script>
 
