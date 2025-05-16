@@ -6,14 +6,14 @@
 #include <M5Atom.h>
 
 // Define the pin for the LED.
-#define FLASH_PIN 26
+#define FLASH_PIN 25
 
 // Morse code timing constants (in milliseconds).
-extern const int DOT_TIME;         // Duration of a dot
-extern const int DASH_TIME;        // Duration of a dash (typically 3 * DOT_TIME)
-extern const int GAP_INTRA_CHAR;   // Gap between dots/dashes within the same character (typically DOT_TIME)
-extern const int GAP_LETTER;       // Gap between letters (typically 2 * DOT_TIME, after intra-char gap)
-extern const int GAP_WORD;         // Gap between words (typically 7 * DOT_TIME, after intra-char gap)
+extern const short DOT_TIME;         // Duration of a dot
+extern const short DASH_TIME;        // Duration of a dash (typically 3 * DOT_TIME)
+extern const short GAP_INTRA_CHAR;   // Gap between dots/dashes within the same character (typically DOT_TIME)
+extern const short GAP_LETTER;       // Gap between letters (typically 2 * DOT_TIME, after intra-char gap)
+extern const short GAP_WORD;         // Gap between words (typically 7 * DOT_TIME, after intra-char gap)
 
 /**
  * @brief Transmits a Morse code dot.

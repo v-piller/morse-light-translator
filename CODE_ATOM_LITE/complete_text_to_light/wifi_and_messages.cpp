@@ -38,14 +38,14 @@ struct ServerDetails server_setup(){
   Serial.println("Répondeur mDNS local démarré (esp32-morse-client.local)");
     delay(1000); // Laisser le temps au réseau et mDNS de s'initialiser
     Serial.println("Recherche du serveur Morse ('_http._tcp') via mDNS...");
-    int n = MDNS.queryService("http", "tcp"); // Cherche TOUS les services HTTP sur TCP
+    int8_t n = MDNS.queryService("http", "tcp"); // Cherche TOUS les services HTTP sur TCP
     if (n == 0) {
         Serial.println("Aucun service HTTP trouvé sur le réseau.");
     } 
     else {
         Serial.print(n);
         Serial.println(" service(s) HTTP trouvé(s):");
-        for (int i = 0; i < n; ++i) {
+        for (int8_t i = 0; i < n; ++i) {
         // Affiche les détails de chaque service trouvé
         Serial.print("  "); Serial.print(i + 1); Serial.print(": ");
         Serial.print(MDNS.hostname(i)); // Nom de l'instance (ex: "morse-server")
@@ -98,7 +98,7 @@ void sendMessage(struct ServerDetails serverDetails, const char* message) {
         // Prépare les données à envoyer (le message "test")
        String postData = "msg=" + String(message) + "&sender=device";
         // Exécute la requête POST
-        int httpCode = http.POST(postData);
+        int8_t httpCode = http.POST(postData);
 
         // Vérifie le code de retour HTTP
         if (httpCode > 0) {
@@ -151,29 +151,29 @@ String receiveMessage(struct ServerDetails serverDetails) {
                 Serial.println("[receiveMessage] Réponse brute du serveur: " + payload);
 
                 // Parsing JSON manuel amélioré pour extraire la valeur de "msg"
-                int key_idx = payload.indexOf("\"msg\""); // Cherche la clé exacte "\"msg\""
+                int8_t key_idx = payload.indexOf("\"msg\""); // Cherche la clé exacte "\"msg\""
                 if (key_idx != -1) {
                     // Clé trouvée. Chercher les deux-points après la clé.
                     // Longueur de "\"msg\"" est 5.
-                    int colon_idx = payload.indexOf(":", key_idx + 5);
+                    int8_t colon_idx = payload.indexOf(":", key_idx + 5);
                     if (colon_idx != -1) {
                         // Deux-points trouvés. Chercher le guillemet ouvrant de la valeur.
-                        int value_start_quote_idx = payload.indexOf("\"", colon_idx + 1);
+                        int8_t value_start_quote_idx = payload.indexOf("\"", colon_idx + 1);
                         if (value_start_quote_idx != -1) {
                             // Guillemet ouvrant trouvé. Chercher le guillemet fermant de la valeur.
-                            int value_end_quote_idx = payload.indexOf("\"", value_start_quote_idx + 1);
+                            int8_t value_end_quote_idx = payload.indexOf("\"", value_start_quote_idx + 1);
                             if (value_end_quote_idx != -1) {
                                 // Guillemet fermant trouvé. Extraire la sous-chaîne.
                                 messageContent = payload.substring(value_start_quote_idx + 1, value_end_quote_idx);
                                 Serial.println("[receiveMessage] Message parsé ('msg'): " + messageContent);
                                 // Extraire "sender"
-                                int sender_key_idx = payload.indexOf("\"sender\"");
+                                int8_t sender_key_idx = payload.indexOf("\"sender\"");
                                 if (sender_key_idx != -1) {
-                                    int sender_colon_idx = payload.indexOf(":", sender_key_idx + 8); 
+                                    int8_t sender_colon_idx = payload.indexOf(":", sender_key_idx + 8); 
                                     if (sender_colon_idx != -1) {
-                                        int sender_value_start_quote_idx = payload.indexOf("\"", sender_colon_idx + 1);
+                                        int8_t sender_value_start_quote_idx = payload.indexOf("\"", sender_colon_idx + 1);
                                         if (sender_value_start_quote_idx != -1) {
-                                            int sender_value_end_quote_idx = payload.indexOf("\"", sender_value_start_quote_idx + 1);
+                                            int8_t sender_value_end_quote_idx = payload.indexOf("\"", sender_value_start_quote_idx + 1);
                                             if (sender_value_end_quote_idx != -1) {
                                                 // C'EST ICI QUE senderId OBTIENT SA VALEUR :
                                                 senderId = payload.substring(sender_value_start_quote_idx + 1, sender_value_end_quote_idx);
@@ -208,7 +208,7 @@ String receiveMessage(struct ServerDetails serverDetails) {
                     }
                 } else {
                     Serial.println("[receiveMessage] Erreur parsing JSON: Clé '\"msg\"' non trouvée.");
-                    int old_msg_key_start = payload.indexOf("\"message\"");
+                    int8_t old_msg_key_start = payload.indexOf("\"message\"");
                     if (old_msg_key_start != -1) {
                          Serial.println("[receiveMessage] Info: Ancienne clé '\"message\"' trouvée, mais '\"msg\"' était attendue et non trouvée.");
                     }

@@ -12,7 +12,7 @@
  */
 struct ServerDetails {
   IPAddress ip;      // Adresse IP du serveur
-  int port;          // Port du serveur
+  short port;          // Port du serveur
   bool found;        // true si le serveur a été trouvé, false sinon
 };
 
