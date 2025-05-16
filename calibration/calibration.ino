@@ -7,7 +7,7 @@ const int sample_interval = 50;
 const int buffer_size = calibration_duration_ms/sample_interval;
 const int sample_interval_msg = 50;
 const int max_entries = 100;
-
+const unsigned long maximum_idle_duration = 3000;
 
 
 uint16_t calibration_buffer[buffer_size];
@@ -21,6 +21,8 @@ int threshold = 0;
 bool idle = true; 
 unsigned long edge_start = 0; 
 unsigned long duration = 0;
+unsigned long last_edge_time = 0; //timer pour arrêter l'écoute quand le temps de pause est trop long
+
 
 struct Etat {
     uint8_t etat; // 0 = lumière OFF, 1 = lumière ON
@@ -66,10 +68,20 @@ float computeStdDev(uint16_t arr[], int n, float mean){
 int findMin (uint16_t arr[], int n){
   int minVal = arr[0];
   for (int i = 0; i < n; i++){
-    if (arr[i] > minVal) minVal = arr[i];
+    if (arr[i] < minVal) minVal = arr[i];
   }
   return minVal;
 }
+
+String flashTableToString() {
+  String result = "";
+  for (int i = 0; i < result_index; i++) {
+    result += String(flash_table[i].etat) + ":" + String(flash_table[i].duration) + "ms";
+    if (i < result_index - 1) result += "/";
+  }
+  return result;
+}
+
 
 void setup() {
   M5.begin(true, false, true);
@@ -97,19 +109,20 @@ min_value = findMin(calibration_buffer, buffer_size);
 threshold = median + 1.5 * stddev;
 Serial.printf("Mean: %.2f, StdDev: %.2f, Median: %.2f, Min: %d, Threshold: %d\n", mean, stddev, median, min_value, threshold);
 
-
+last_edge_time = millis();
 }
 
 void loop() {
-  if (result_index >= min_entries){
+  if (result_index >= max_entries){
     Serial.println ("Tableau plein, arrêt de la détection");
     while (true);
     }
+
   uint16_t val = analogRead(32);
   unsigned long now = millis();
 
   if (idle && val < threshold){//sauf erreur plus c'est lumineux plus val est basse (à vérifier)
-     // 🔺 Front montant (lumière vient de s’allumer)
+     //Front montant (lumière vient de s’allumer)
      //on enregistre donc les données de la pause (idle moment qui vient de se terminer)
      duration = now - edge_start;
      //si edge start est encore à 0 c'est pas une pause mais l'attente avant le msg
@@ -123,9 +136,9 @@ void loop() {
      edge_start = now; 
      idle = false;
      Serial.println("Flash ON");
-  }
-  else if (!idle && val > threshold){
-  // 🔻 Front descendant (lumière vient de s’éteindre)
+
+  }  else if (!idle && val > threshold) {
+  //Front descendant (lumière vient de s’éteindre)
   duration = now - edge_start;// on retient la durée du flash
   flash_table[result_index].etat = 1; //ON
   flash_table[result_index].duration = duration;
@@ -134,21 +147,22 @@ void loop() {
 
   edge_start = now; 
   idle = true;
+  last_edge_time = now;
   Serial.println("Flash OFF");
   }
 
+if (idle && (millis() - last_edge_time > maximum_idle_duration)) {
+  Serial.println("Transmission terminée (inactivité détectée).");
+
+  String flashData = flashTableToString();
+  Serial.println(flashData); // Pour test — ensuite tu peux utiliser `flashData` ailleurs
+  
+  // À ce stade, tu pourrais par exemple appeler une autre fonction qui décode cette chaîne.
+  while (true); // stop loop
+}
+
   delay(sample_interval);
   
-  }
-  
-  
-
-  
-
-
-
-
-
 } 
 
 
