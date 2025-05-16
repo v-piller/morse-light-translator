@@ -130,7 +130,7 @@ void loop() {
   flash_table[result_index].etat = 1; //ON
   flash_table[result_index].duration = duration;
   result_index++;
-  Serial.printf("💡 ON - durée : %lu ms\n", duration);
+  Serial.printf("ON - durée : %lu ms\n", duration);
 
   edge_start = now; 
   idle = true;
