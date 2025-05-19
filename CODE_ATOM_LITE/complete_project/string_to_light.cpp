@@ -30,36 +30,22 @@ void transmitDash() {
 
 //make lights go off and on with the whole string/message already in morse
 void transmitMessage(const char* text) {
-  char morseBuf[512];
-  text_to_morse(text, morseBuf);
-  Serial.print("Morse message: ");
-  Serial.println(morseBuf);
+    char morseBuf[512];               // Buffer stays local to this function
+    text_to_morse(text, morseBuf);
+    Serial.print("Morse message: ");
+    Serial.println(morseBuf);          // Print Morse for debugging
 
-  for (int i = 0; morseBuf[i] != '\0'; ++i) {
-    char c = morseBuf[i];
-    char next = morseBuf[i + 1];
-
-    if (c == '.') {
-      digitalWrite(FLASH_PIN, HIGH);
-      delay(DOT_TIME);
-      digitalWrite(FLASH_PIN, LOW);
-      // only delay if not followed by space or slash
-      if (next != ' ' && next != '/' && next != '\0') delay(GAP_INTRA_CHAR);
+    for (int8_t i = 0; morseBuf[i] != '\0'; ++i) {
+        char c = morseBuf[i];
+        if (c == '.') transmitDot();
+        else if (c == '-') transmitDash();
+        else if (c == ' ') {
+            // end of letter
+            delay(2*DOT_TIME);
+        }
+        else if (c == '/') {
+            // end of word
+            delay(6*DOT_TIME);
+        }
     }
-
-    else if (c == '-') {
-      digitalWrite(FLASH_PIN, HIGH);
-      delay(DASH_TIME);
-      digitalWrite(FLASH_PIN, LOW);
-      if (next != ' ' && next != '/' && next != '\0') delay(GAP_INTRA_CHAR);
-    }
-
-    else if (c == ' ') {
-      delay(GAP_LETTER);  // 600ms
-    }
-
-    else if (c == '/') {
-      delay(GAP_WORD);    // 1400ms
-    }
-  }
 }
