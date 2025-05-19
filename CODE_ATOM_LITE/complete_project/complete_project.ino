@@ -4,6 +4,8 @@
 #include "wifi_and_messages.h" // Gère la connexion Wi-Fi, mDNS et la communication HTTP
 #include "string_to_light.h"   // Gère la transmission Morse via LED (utilise morse.h)
 #include "morse.h"             // Gère la conversion texte <-> morse (utilisé par string_to_light)
+#include "binaryToText.h"
+#include "flash_detector.h"
 
 TaskHandle_t Task1 = NULL;
 TaskHandle_t Task2 = NULL;
@@ -18,6 +20,8 @@ struct ServerDetails morseServer;
 // Variables pour la temporisation de l'envoi des messages
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 60000; // 60 secondes
+// output de la transformation de signaux à texte
+char outputText[512];
 
 void Task1code( void * pvParameters ) {
   Serial.print("Task 1 s'exécute sur le coeur : ");
@@ -26,21 +30,26 @@ void Task1code( void * pvParameters ) {
   // Boucle infinie de la tâche
   for(;;) {
     if (morseServer.found) {
-      unsigned long currentTime = millis();
+      String detectedSequence = processFlashDetection();
 
-    // Envoi périodique d'un message de test
-    if (currentTime - lastSendTime >= sendInterval) {
-      Serial.println("Envoi d'un message de test périodique ('ping_from_device')...");
-      sendMessage(morseServer, "ping_from_device"); // Utilise la fonction de wifi_and_messages
-      lastSendTime = currentTime;
-    }
+  // Si la fonction a retourné une chaîne non vide, cela signifie qu'une séquence a été détectée
+  if (detectedSequence.length() > 0) {
+    Serial.println("--- Séquence de Flashs Détectée ---");
+    Serial.println(detectedSequence); // Affiche la séquence détectée
+    Serial.println("----------------------------------");
+    binaryToText(detectedSequence.c_str(), outputText);
+    Serial.print("Texte converti : ");
+    Serial.println(outputText);
+    sendMessage(morseServer, outputText);
+
+  }
+
     } else {
     Serial.println("Serveur Morse non disponible. En attente...");
     delay(5000); // Attendre avant de potentiellement réessayer la découverte ou pour éviter le spam
     morseServer = server_setup();
     if(morseServer.found) Serial.println("Serveur Morse redécouvert !");
   }
-  vTaskDelay(100 / portTICK_PERIOD_MS);
 
     }
   }
@@ -87,6 +96,14 @@ void setup() {
   } else {
     Serial.println("Setup terminé : Serveur Morse non trouvé.");
   }
+  pinMode(SENSOR_PIN, INPUT);  // Configure la broche du capteur en entrée (utilise la constante de la librairie)
+
+  // Appelle la fonction de calibration de la librairie
+  calibrateSensor();
+
+  Serial.println("Prêt à détecter les séquences de flashs...");
+
+
   Serial.println("--- Démo Dual Core ESP32 ---");
   Serial.print("Setup() s'exécute sur le coeur : ");
   Serial.println(xPortGetCoreID()); // Affiche le coeur sur lequel setup() tourne (généralement 1)
