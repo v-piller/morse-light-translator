@@ -11,23 +11,6 @@
 #define GAP_WORD 1400
 #define TOLERANCE 50
 
-
-// message should say "Hello"
-// message should say "Hello world"
-char message[] =
-  "1:200/0:200/1:200/0:200/1:200/0:200/1:200/0:600/"      // H = ....
-  "1:200/0:600/"                                           // E = .
-  "1:200/0:200/1:600/0:200/1:200/0:200/1:200/0:600/"       // L = .-..
-  "1:200/0:200/1:600/0:200/1:200/0:200/1:200/0:600/"       // L = .-..
-  "1:600/0:200/1:600/0:200/1:600/0:1400/"                  // O = ---
-  "1:200/0:200/1:600/0:200/1:600/0:600/"                   // W = .--
-  "1:600/0:200/1:600/0:200/1:600/0:600/"                   // O = ---
-  "1:200/0:200/1:600/0:200/1:200/0:600/"                   // R = .-.
-  "1:200/0:200/1:600/0:200/1:200/0:200/1:200/0:600/"       // L = .-..
-  "1:600/0:200/1:200/0:200/1:200";                         // D = -..
-
-char textOut[512];
-
 //Checks wheter a number is close enough to a target
 //Return true if the value is between (target - tolerance) and (target + tolerance)
 bool approx(int value, int target) {
@@ -90,7 +73,7 @@ void binaryToText(const char* inputBinaryString, char* outputText) {
   Serial.print("Message in morse: ");
   Serial.println(morseOut);
 
-  morse_to_text(morseOut, textOut);
+  morse_to_text(morseOut, outputText);
 
 
 
