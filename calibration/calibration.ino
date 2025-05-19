@@ -1,168 +1,215 @@
 #include <M5Atom.h>
 #include <math.h>
 
+// --- Constantes ---
+const int calibration_duration_ms = 5000; // Durée de la phase de calibration en ms
+const int sample_interval = 50;           // Intervalle entre les lectures du capteur en ms
+const int buffer_size = calibration_duration_ms / sample_interval; // Nombre d'échantillons pour la calibration
+const int max_entries = 100;              // Nombre maximum d'événements (ON/OFF) à stocker
+const unsigned long maximum_idle_duration = 3000; // Durée d'inactivité maximale avant de considérer la séquence terminée en ms
 
-const int calibration_duration_ms = 5000;
-const int sample_interval = 50;
-const int buffer_size = calibration_duration_ms/sample_interval;
-const int sample_interval_msg = 50;
-const int max_entries = 100;
-const unsigned long maximum_idle_duration = 3000;
+// --- Variables globales pour la calibration et le seuil ---
+uint16_t calibration_buffer[buffer_size]; // Buffer pour stocker les lectures pendant la calibration
+float mean = 0;                           // Moyenne des lectures de calibration
+float stddev = 0;                         // Écart-type des lectures de calibration
+float median = 0;                         // Médiane des lectures de calibration
+int min_value = 0;                        // Valeur minimale lue pendant la calibration
+int threshold = 0;                        // Seuil de luminosité pour distinguer ON/OFF
 
+// --- Variables globales pour la détection et le suivi d'état ---
+bool idle = true;                         // Indique si le système est en état d'inactivité (pas de flash en cours)
+unsigned long edge_start = 0;             // Moment (millis()) du dernier changement d'état détecté
+unsigned long duration = 0;               // Durée de l'état précédent
+unsigned long last_edge_time = 0;         // Moment (millis()) du dernier front détecté (utilisé pour l'inactivité)
 
-uint16_t calibration_buffer[buffer_size];
-
-float mean = 0;
-float stddev = 0;
-float median = 0; 
-int min_value = 0;
-int threshold = 0;
-
-bool idle = true; 
-unsigned long edge_start = 0; 
-unsigned long duration = 0;
-unsigned long last_edge_time = 0; //timer pour arrêter l'écoute quand le temps de pause est trop long
-
-
+// --- Structure pour stocker les événements (état + durée) ---
 struct Etat {
-    uint8_t etat; // 0 = lumière OFF, 1 = lumière ON
+    uint8_t etat;     // 0 = lumière OFF, 1 = lumière ON
     unsigned long duration; // durée en ms
-  };
+};
 
-  Etat flash_table[max_entries];
-  int result_index = 0;
+// --- Tableau pour stocker la séquence d'événements détectés ---
+Etat flash_table[max_entries];
+int result_index = 0; // Index de la prochaine position libre dans flash_table
 
-int compare (const void *a, const void *b){
-  int val_a = *(uint16_t *)a;
-  int val_b = *(uint16_t *)b;
+// --- Fonctions utilitaires pour les statistiques ---
 
-  if (val_a < val_b) return -1;
-  if (val_a > val_b) return 1;
-  return 0;
+// Fonction de comparaison pour qsort (tri pour la médiane)
+int compare(const void *a, const void *b) {
+    int val_a = *(uint16_t *)a;
+    int val_b = *(uint16_t *)b;
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
 }
 
+// Calcule la médiane d'un tableau
 float computeMedian(uint16_t arr[], int n) {
-  qsort(arr, n, sizeof(uint16_t), compare);
-  if (n % 2 == 0)
-    return (arr[n / 2 - 1] + arr[n / 2]) / 2.0;
-  else
-    return arr[n / 2];
+    qsort(arr, n, sizeof(uint16_t), compare);
+    if (n % 2 == 0)
+        return (arr[n / 2 - 1] + arr[n / 2]) / 2.0;
+    else
+        return arr[n / 2];
 }
 
-float computeMean (uint16_t arr[], int n){
-  float sum = 0;
-  for (int i = 0; i < n; i++){
-    sum += arr[i];
-  }
-  return sum / n;
+// Calcule la moyenne d'un tableau
+float computeMean(uint16_t arr[], int n) {
+    float sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += arr[i];
+    }
+    return sum / n;
 }
 
-float computeStdDev(uint16_t arr[], int n, float mean){
-  float sumSq = 0;
-  for(int i = 0; i < n; i++ ){
-    sumSq += pow(arr[i] - mean, 2);
-  }
-  return sqrt(sumSq/n);
+// Calcule l'écart-type d'un tableau
+float computeStdDev(uint16_t arr[], int n, float mean) {
+    float sumSq = 0;
+    for (int i = 0; i < n; i++) {
+        sumSq += pow(arr[i] - mean, 2);
+    }
+    return sqrt(sumSq / n);
 }
 
-int findMin (uint16_t arr[], int n){
-  int minVal = arr[0];
-  for (int i = 0; i < n; i++){
-    if (arr[i] < minVal) minVal = arr[i];
-  }
-  return minVal;
+// Trouve la valeur minimale dans un tableau
+int findMin(uint16_t arr[], int n) {
+    int minVal = arr[0];
+    for (int i = 0; i < n; i++) {
+        if (arr[i] < minVal) minVal = arr[i];
+    }
+    return minVal;
 }
 
+// Convertit le contenu de flash_table en une chaîne de caractères formatée
 String flashTableToString() {
-  String result = "";
-  for (int i = 0; i < result_index; i++) {
-    result += String(flash_table[i].etat) + ":" + String(flash_table[i].duration) + "ms";
-    if (i < result_index - 1) result += "/";
-  }
-  return result;
+    String result = "";
+    for (int i = 0; i < result_index; i++) {
+        result += String(flash_table[i].etat) + ":" + String(flash_table[i].duration);
+        if (i < result_index - 1) result += "/";
+    }
+    return result;
 }
 
+// --- Nouvelle fonction pour la calibration ---
+void calibrateSensor() {
+    Serial.println("Acquisition de données pour le calibrage...");
+    unsigned long start_time = millis();
+    int i = 0;
 
-void setup() {
-  M5.begin(true, false, true);
-  Serial.begin(115200);
-  pinMode(32, INPUT);
-
-
-Serial.println("Acquisition de données pour le calibrage...");
-unsigned long start_time = millis();
-int i = 0;
-
-while (millis() - start_time < calibration_duration_ms && (i < buffer_size)){
-    calibration_buffer[i] = analogRead(32);
-    delay(sample_interval);
-    i++;
-  }
-
-mean = computeMean(calibration_buffer, buffer_size);
-stddev = computeStdDev(calibration_buffer, buffer_size);
-median = computeMedian(calibration_buffer, buffer_size);
-min_value = findMin(calibration_buffer, buffer_size);
-
-// Choisir une des deux stratégies :
-// threshold = min_value + 0.5 * stddev;
-threshold = median + 1.5 * stddev;
-Serial.printf("Mean: %.2f, StdDev: %.2f, Median: %.2f, Min: %d, Threshold: %d\n", mean, stddev, median, min_value, threshold);
-
-last_edge_time = millis();
-}
-
-void loop() {
-  if (result_index >= max_entries){
-    Serial.println ("Tableau plein, arrêt de la détection");
-    while (true);
+    // Collecte les échantillons de luminosité pendant la durée de calibration
+    while (millis() - start_time < calibration_duration_ms && (i < buffer_size)) {
+        calibration_buffer[i] = analogRead(32); // Lit la valeur du capteur (broche 32)
+        delay(sample_interval);                 // Attend l'intervalle d'échantillonnage
+        i++;
     }
 
-  uint16_t val = analogRead(32);
-  unsigned long now = millis();
+    // Calcule les statistiques à partir des données de calibration
+    mean = computeMean(calibration_buffer, buffer_size);
+    stddev = computeStdDev(calibration_buffer, buffer_size, mean);
+    median = computeMedian(calibration_buffer, buffer_size);
+    min_value = findMin(calibration_buffer, buffer_size);
 
-  if (idle && val < threshold){//sauf erreur plus c'est lumineux plus val est basse (à vérifier)
-     //Front montant (lumière vient de s’allumer)
-     //on enregistre donc les données de la pause (idle moment qui vient de se terminer)
-     duration = now - edge_start;
-     //si edge start est encore à 0 c'est pas une pause mais l'attente avant le msg
-     if (edge_start > 0){
-      flash_table[result_index].etat = 0;
-      flash_table[result_index].duration = duration;
-      result_index++;
-      Serial.printf("OFF - durée : %lu ms\n", duration);//%lu c'est le format specifier pour les unsigned long integers
-     }
+    // Calcule le seuil. Utilise la médiane + 1.5 * écart-type pour plus de robustesse.
+    // Si une valeur basse = lumineux, alors une lecture < threshold = ON.
+    threshold = median - 2.5 * stddev;
 
-     edge_start = now; 
-     idle = false;
-     Serial.println("Flash ON");
+    // Affiche les résultats de la calibration
+    Serial.printf("Calibration terminée. Mean: %.2f, StdDev: %.2f, Median: %.2f, Min: %d, Threshold: %d\n", mean, stddev, median, min_value, threshold);
 
-  }  else if (!idle && val > threshold) {
-  //Front descendant (lumière vient de s’éteindre)
-  duration = now - edge_start;// on retient la durée du flash
-  flash_table[result_index].etat = 1; //ON
-  flash_table[result_index].duration = duration;
-  result_index++;
-  Serial.printf("ON - durée : %lu ms\n", duration);
-
-  edge_start = now; 
-  idle = true;
-  last_edge_time = now;
-  Serial.println("Flash OFF");
-  }
-
-if (idle && (millis() - last_edge_time > maximum_idle_duration)) {
-  Serial.println("Transmission terminée (inactivité détectée).");
-
-  String flashData = flashTableToString();
-  Serial.println(flashData); // Pour test — ensuite tu peux utiliser `flashData` ailleurs
-  
-  // À ce stade, tu pourrais par exemple appeler une autre fonction qui décode cette chaîne.
-  while (true); // stop loop
+    // Initialise le timer d'inactivité après la calibration
+    last_edge_time = millis();
 }
 
-  delay(sample_interval);
-  
-} 
+// --- Nouvelle fonction pour la détection des flashs et l'obtention des données ---
+// Retourne une String contenant les données de la séquence si terminée, sinon une String vide.
+String processFlashDetection() {
+    // Vérifie si le tableau de résultats est plein
+    if (result_index >= max_entries) {
+        Serial.println("Tableau plein, séquence terminée.");
+        String flashData = flashTableToString(); // Obtient la chaîne de données
+        // Réinitialise les variables pour une nouvelle séquence
+        result_index = 0;
+        idle = true;
+        edge_start = 0; // Réinitialise le début de l'arête
+        last_edge_time = millis(); // Réinitialise le timer d'inactivité
+        return flashData; // Retourne les données
+    }
 
+    uint16_t val = analogRead(32); // Lit la valeur actuelle du capteur
+    unsigned long now = millis();  // Obtient le temps actuel
 
+    // Détection du front montant (passage de OFF à ON)
+    // Si le système est idle et la lecture est sous le seuil (lumineux)
+    if (idle && val < threshold) {
+        // Enregistre la durée de la pause (état OFF) qui vient de se terminer
+        duration = now - edge_start;
+        // N'enregistre pas la toute première "pause" avant le premier flash (quand edge_start est 0)
+        if (edge_start > 0) {
+            flash_table[result_index].etat = 0; // État OFF
+            flash_table[result_index].duration = duration;
+            result_index++;
+            Serial.printf("OFF - durée : %lu ms\n", duration);
+        }
+
+        edge_start = now; // Marque le début de l'état ON
+        idle = false;     // Le système n'est plus idle
+        Serial.println("Flash ON détecté");
+        last_edge_time = now; // Met à jour le timer d'inactivité
+    }
+    // Détection du front descendant (passage de ON à OFF)
+    // Si le système n'est pas idle (est ON) et la lecture est au-dessus du seuil (sombre)
+    else if (!idle && val > threshold) {
+        // Enregistre la durée du flash (état ON) qui vient de se terminer
+        duration = now - edge_start;
+        flash_table[result_index].etat = 1; // État ON
+        flash_table[result_index].duration = duration;
+        result_index++;
+        Serial.printf("ON - durée : %lu ms\n", duration);
+
+        edge_start = now; // Marque le début de l'état OFF (pause)
+        idle = true;      // Le système est maintenant idle
+        Serial.println("Flash OFF détecté");
+        last_edge_time = now; // Met à jour le timer d'inactivité
+    }
+
+    // Vérifie l'inactivité prolongée pour détecter la fin de la séquence
+    if (idle && (millis() - last_edge_time > maximum_idle_duration)) {
+        Serial.println("Transmission terminée (inactivité détectée).");
+        String flashData = flashTableToString(); // Obtient la chaîne de données
+        // Réinitialise les variables pour une nouvelle séquence
+        result_index = 0;
+        idle = true;
+        edge_start = 0; // Réinitialise le début de l'arête
+        last_edge_time = millis(); // Réinitialise le timer d'inactivité
+        return flashData; // Retourne les données
+    }
+
+    delay(sample_interval); // Attend l'intervalle d'échantillonnage avant la prochaine lecture
+
+    return ""; // Aucune séquence terminée, retourne une chaîne vide
+}
+
+// --- Fonction setup ---
+void setup() {
+    M5.begin(true, false, true); // Initialise le M5Atom (Serial, I2C, Power)
+    Serial.begin(115200);        // Initialise la communication série
+    pinMode(32, INPUT);          // Configure la broche 32 en entrée pour le capteur
+
+    calibrateSensor(); // Appelle la fonction de calibration
+}
+
+// --- Fonction loop ---
+void loop() {
+    // Appelle la fonction de détection des flashs
+    String detectedSequence = processFlashDetection();
+
+    // Si la fonction a retourné une chaîne non vide, cela signifie qu'une séquence a été détectée
+    if (detectedSequence.length() > 0) {
+        Serial.println("--- Séquence de Flashs Détectée ---");
+        Serial.println(detectedSequence); // Affiche la séquence détectée
+        Serial.println("----------------------------------");
+        // Le système est maintenant prêt à détecter la prochaine séquence
+    }
+
+    // La fonction processFlashDetection() contient déjà le delay(sample_interval);
+    // donc pas besoin d'en ajouter un ici.
+}
