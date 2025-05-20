@@ -6,8 +6,8 @@
 const short DOT_TIME = 200;             // 200 ms for a dot
 const short DASH_TIME = 3 * DOT_TIME;   // 600 ms for a dash (3 units)
 const short GAP_INTRA_CHAR = DOT_TIME;  // 200 ms gap between parts of the same letter
-const short GAP_LETTER = 2 * DOT_TIME;  // 600 ms gap between letters, minus one already include break
-const short GAP_WORD = 6 * DOT_TIME;    // 1400 ms gap between words, minus one already include break
+const short GAP_LETTER = DOT_TIME * 2; // 400 ms to add to the existing 200 ms
+const short GAP_WORD = 2 * DOT_TIME;    // add 400 ms to reach 1400
 
 
 
@@ -41,11 +41,11 @@ void transmitMessage(const char* text) {
         else if (c == '-') transmitDash();
         else if (c == ' ') {
             // end of letter
-            delay(2*DOT_TIME);
+            delay(GAP_LETTER);
         }
         else if (c == '/') {
             // end of word
-            delay(6*DOT_TIME);
+            delay(GAP_WORD);
         }
     }
 }
