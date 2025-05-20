@@ -6,10 +6,11 @@
 #include "morse.h"             // Gère la conversion texte <-> morse (utilisé par string_to_light)
 #include "binaryToText.h"
 #include "flash_detector.h"
+#include "history.h"
 
 TaskHandle_t Task1 = NULL;
 TaskHandle_t Task2 = NULL;
-
+OverwritingRingBuffer = msgBuffer; 
 // Constantes pour la connexion Wi-Fi
 const char* ssid = "SURFACE-JEREMIE 2090";
 const char* password = ">40Fc667";
@@ -78,7 +79,8 @@ void Task2code( void * pvParameters ) {
 void setup() {
   Serial.begin(115200);
   M5.begin(true, false, true); // Initialise M5Atom (Serial, I2C, Display activé)
-
+  
+  ORB_init(&msgBuffer); // Initialise le ring buffer
   
   // Par sécurité,
   pinMode(FLASH_PIN, OUTPUT);      // Défini dans string_to_light.h comme G26
