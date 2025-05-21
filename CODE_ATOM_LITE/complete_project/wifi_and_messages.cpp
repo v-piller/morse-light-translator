@@ -25,6 +25,14 @@ void wifi_setup(const char* ssid, const char* password){
     Serial.println(" Connecté!");
     Serial.print("Adresse IP de l'ESP32 : ");
     Serial.println(WiFi.localIP()); // Affiche l'IP obtenue
+    configTime(3600, 3600, "pool.ntp.org"); // fuseau horaire +1h, avec DST
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        Serial.println("Erreur de synchronisation NTP");
+    } else {
+        Serial.println(&timeinfo, "Heure actuelle : %Y-%m-%d %H:%M:%S");
+}
+
 }
 
 struct ServerDetails server_setup(){
